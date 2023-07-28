@@ -79,17 +79,17 @@ class Scraper {
   }
 }
 
+//<-------------Product Scraper--------------->
 class ProductScraper{
   constructor(page){
     this.page=page;
-    this.url=url;
   }
   async scrapeData(){
     // price
     try{
       const price = await this.page.evaluate(() => {
         const element = document.querySelector('span.a-price > span.a-offscreen');
-        return element ? element.textContent : null;
+        return element ? element.textContent : 'Not found';
       });
       console.log(price);
     }
@@ -98,43 +98,115 @@ class ProductScraper{
     try{
       const image = await this.page.evaluate(() => {
         const element = document.querySelector('#landingImage');
-        return element ? element.getAttribute('src') : null;
+        return element ? element.getAttribute('src') : 'Not found';
       });
       console.log(image);
     }
     catch(error){}
     //name
-
+    try{
+      let nameTemp = await this.page.evaluate(() => {
+        const element = document.querySelector('#productTitle');
+        return element ? element.textContent : 'Not found';
+      });
+      const name = nameTemp.ProductName.replace(/[\n,"']/g, " ").trim();
+      console.log(name);
+    }
+    catch(error){}
+    // Number Of Reviews
+    try{
+      let ratingsTemp = await this.page.evaluate(() => {
+        const element = document.querySelector('#acrCustomerReviewText');
+        return element ? element.textContent : 'Not found';
+      })
+      const ratings = parseInt(ratingsTemp.replace(/[,]/g, ""));
+      console.log(ratings);
+    }
+    catch(error){
+      console.log('error');
+    }
+    // Rating
+    try{
+      const rating = parseFloat(await this.page.evaluate(() => {
+        const element = document.querySelector('#acrPopover > span.a-declarative > a > span');
+        return element ? element.textContent : 'Not found';
+      }));
+      console.log(rating);
+    }
+    catch(error){
+      console.log('error');
+    }
     //Launch Date
-
+    try{
+      const launchDate = await this.page.evaluate(() => {
+        const element = document.querySelector('#detailBullets_feature_div .detail-bullet-list');
+        let launchDate = 'Not Found';
+        if (!element) return null;
+        const listItems = element.querySelectorAll('li');
+        listItems.forEach((item)=>{
+          const text = item.textContent.trim();
+          if(text.includes('Date First Available')){
+            launchDate = text.slice(27).replace(/[,]/g, "-").replace(/[ :\n]/g,"").trim();
+          }
+        });
+        return launchDate;
+      });
+      console.log(launchDate);
+    }
+    catch(error){
+      console.log(error);
+    }
     //BSR (best seller ranking)
-
-    //number of reviews
-
-    //rating
-
-    //Amazon's Choice
-
-    //how much was bought last month
-    //category
-    //to evaluate competition we will compare the number of search results to number of reviews and sales per month of the products their
-
+    try{
+      const bsr = await this.page.evaluate(() => {
+        const element = document.querySelector('#detailBulletsWrapper_feature_div > ul:nth-child(4) > li > span');
+        return element ? element.textContent.slice(27).trim() : 'Not found';
+      })
+      console.log(bsr);
+    }
+    catch(error){
+      console.log('error');
+    }
+    //category 
+    try{
+      const category = await this.page.evaluate(() => {
+        const element = document.querySelector('#wayfinding-breadcrumbs_container');
+        return element ? element.textContent.replace(/[\n, ]/g, "").trim() : 'Not found';
+      })
+      console.log(category);
+    }
+    catch(error){
+      console.log('error');
+    }
+    //Brand
+    try{
+      let brandString = await this.page.evaluate(() => {
+        const element = document.querySelector('#bylineInfo');
+        return element ? element.textContent.trim() : 'Not found';
+      });
+      const brand = brandString.slice(0,1) === "V"? brandString.slice(10) : brandString.slice(7);
+      
+      console.log(brand);
+    }
+    catch(error){
+      console.log('error');
+    }
     await this.previousPage();
   }
   async previousPage(){
     await this.page.goBack();
   } 
 }
-//
+//<------------------------------------------->
 
 (async ()=>{
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: 'new',
     defaultViewport: false,
     userDataDir: "./tmp",
   });
   
-  const myScraper1 = new Scraper(browser,'https://www.amazon.com/Amazon-Essentials-14-Pack-Cotton-Heather/dp/B07JL9J8BK/ref=sr_1_1?qid=1690381611&refinements=p_n_feature_eighteen_browse-bin%3A16926165011&rnid=2528832011&s=fashion-boys-intl-ship&sr=1-1')
+  const myScraper1 = new Scraper(browser,'https://www.amazon.com/dp/B097CV6KBQ/ref=syn_sd_onsite_desktop_0?ie=UTF8&psc=1&pf_rd_p=78171839-c733-4857-996f-d6b4a32913ec&pf_rd_r=WHRGY40SKS4JYMYA3J38&pd_rd_wg=lGSbe&pd_rd_w=40dhA&pd_rd_r=a72675a9-60df-454e-ba2f-b14ec5bde4b8')
   await myScraper1.openPage();
 
   const myScraper = new ProductScraper(myScraper1.page,'https://www.amazon.com/Amazon-Essentials-14-Pack-Cotton-Heather/dp/B07JL9J8BK/ref=sr_1_1?qid=1690381611&refinements=p_n_feature_eighteen_browse-bin%3A16926165011&rnid=2528832011&s=fashion-boys-intl-ship&sr=1-1')
@@ -146,3 +218,7 @@ class ProductScraper{
   
   await browser.close();
 })();
+
+
+//---------->CSV Writer<--------------
+

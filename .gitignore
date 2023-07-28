@@ -1,3 +1,7 @@
+# Puppeter Files
+tmp/
+products.csv
+
 # Logs
 logs
 *.log
