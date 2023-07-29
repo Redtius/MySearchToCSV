@@ -18,61 +18,66 @@ class Scraper {
     {
       this.page = await this.browser.newPage();
       await this.page.goto(this.url);
-
     }
   }
 
   async scrapeData() {
     try {
-      //let isDisabled = await this.page.$('span.s-pagination-item.s-pagination-next.s-pagination-disabled') === null;
-      const productHandles = await this.page.$$('div.s-result-item');
-      //while (isDisabled) {
-      //await delay(2000)
-      //isDisabled = await page.$('span.s-pagination-item.s-pagination-next.s-pagination-disabled') === null;
-      for (const productHandle of productHandles) {
-        let item = {};
-        // price Extraction
-        try {
-          const price = await this.page.evaluate(el => el.querySelector('span.a-price > span.a-offscreen').textContent, productHandle);
-          item.price = price;
-        }
-        catch (error) { }
+      let isDisabled =
+        (await this.page.$(
+          "span.s-pagination-item.s-pagination-next.s-pagination-disabled"
+        )) === null;
+      const productHandles = await this.page.$$("div.s-result-item");
+      const dataFile = new CsvFile(Products,'Image,Last Month Sales,')
+      while (isDisabled) {
+        //await delay(2000)
+        isDisabled =
+          (await page.$(
+            "span.s-pagination-item.s-pagination-next.s-pagination-disabled"
+          )) === null;
+        for (const productHandle of productHandles) {
+          let item = {};
+          //Image Extraction
+          try {
+            const Image = await this.page.evaluate(
+              (el) =>
+                el
+                  .querySelector(
+                    " div.s-product-image-container > span > a > div > img"
+                  )
+                  .getAttribute("src"),
+              productHandle
+            );
+            dataFile.Write(Image,true);
+          } catch (error) {}
+          // Last Month Sales
+          try {
+            //const
+          } catch (error) {}
 
-
-        //Image Extraction
-        try {
-          const Image = await this.page.evaluate(el => el.querySelector(' div.s-product-image-container > span > a > div > img').getAttribute('src'), productHandle);
-          item.image = Image;
-        }
-        catch (error) { }
-        //Product Name
-        try {
-          let ProductName = await this.page.evaluate(el => el.querySelector(' div > div > h2').textContent, productHandle);
-          item.name = ProductName.replace(/[\n,"']/g, " ");
-        }
-        catch (error) { }
-
-        if (item.name !== null) {
-          fs.appendFile('products.csv', `${item.name},${item.price},${item.image}\n`, (err) => {
-            if (err) throw err;
-          })
+          await this.page.click(
+            "a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal"
+          );
+          pageScraper = new ProductScraper(this.page);
+          await pageScraper.scrapeProduct(); // it will automatically comeback to the page
         }
 
+        if (isDisabled) {
+          await page.waitForSelector(
+            "a.s-pagination-item.s-pagination-next.s-pagination-button.s-pagination-separator",
+            { visible: true }
+          );
+          await page.click(
+            "a.s-pagination-item.s-pagination-next.s-pagination-button.s-pagination-separator"
+          );
+        } else {
+          break;
+        }
       }
-
-      /*if (isDisabled) {
-        await page.waitForSelector('a.s-pagination-item.s-pagination-next.s-pagination-button.s-pagination-separator', { visible: true });
-        await page.click("a.s-pagination-item.s-pagination-next.s-pagination-button.s-pagination-separator");
-      }
-      else {
-        break;
-      }*/
-    }
-    catch (error) {
-      console.log(error)
+    } catch (error) {
+      console.log(error);
     }
   }
-
 
   async closePage() {
     await this.page.close();
@@ -84,7 +89,7 @@ class ProductScraper{
   constructor(page){
     this.page=page;
   }
-  async scrapeData(){
+  async scrapeProduct(){
     // price
     try{
       const price = await this.page.evaluate(() => {
@@ -206,15 +211,10 @@ class ProductScraper{
     userDataDir: "./tmp",
   });
   
-  const myScraper1 = new Scraper(browser,'https://www.amazon.com/dp/B097CV6KBQ/ref=syn_sd_onsite_desktop_0?ie=UTF8&psc=1&pf_rd_p=78171839-c733-4857-996f-d6b4a32913ec&pf_rd_r=WHRGY40SKS4JYMYA3J38&pd_rd_wg=lGSbe&pd_rd_w=40dhA&pd_rd_r=a72675a9-60df-454e-ba2f-b14ec5bde4b8')
-  await myScraper1.openPage();
-
-  const myScraper = new ProductScraper(myScraper1.page,'https://www.amazon.com/Amazon-Essentials-14-Pack-Cotton-Heather/dp/B07JL9J8BK/ref=sr_1_1?qid=1690381611&refinements=p_n_feature_eighteen_browse-bin%3A16926165011&rnid=2528832011&s=fashion-boys-intl-ship&sr=1-1')
-
+  const myScraper= new Scraper(browser,'https://www.amazon.com/dp/B097CV6KBQ/ref=syn_sd_onsite_desktop_0?ie=UTF8&psc=1&pf_rd_p=78171839-c733-4857-996f-d6b4a32913ec&pf_rd_r=WHRGY40SKS4JYMYA3J38&pd_rd_wg=lGSbe&pd_rd_w=40dhA&pd_rd_r=a72675a9-60df-454e-ba2f-b14ec5bde4b8')
+  await myScraper.openPage();
   await myScraper.scrapeData();
-  //await myScraper.openPage();
-  //await myScraper.scrapeData();
-  //await myScraper.closePage();
+  await myScraper.closePage();
   
   await browser.close();
 })();
@@ -222,3 +222,29 @@ class ProductScraper{
 
 //---------->CSV Writer<--------------
 
+class CsvFile{
+  constructor(fileName,columns){
+    this.fileName=`${fileName}.csv`;
+    this.creationDate=new Date();
+    fs.writeFile(this.fileName,columns,'utf-8',(err)=>{
+      if(err){
+        console.error('Failed to Create CSV :',err);
+      }
+    });
+
+  }
+
+  Write(content,isNewLine){
+    if(!isNewLine){
+      fs.appendFile('products.csv', `,${content}`, (err) => {
+        if (err) throw err;
+      })
+    }
+    else{
+      fs.appendFile('products.csv', `\n${content}`, (err) => {
+        if (err) throw err;
+      })
+    }
+  }
+
+}
