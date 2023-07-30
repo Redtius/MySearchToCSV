@@ -22,8 +22,8 @@ class Scraper {
     this.url = url;
     this.browser = browser;
     this.dataFile = new CsvFile(
-      'Products',
-      "Image,Last Month Sales,Price,Name,Number Of Reviews,Rating,Launch Date,Best Seller Rank,Category,Brand"
+      'Prod',
+      "Name,Last Month Sales,Price,Image,Number Of Reviews,Rating,Launch Date,Best Seller Rank,Category,Brand\n"
     );
   }
   async openPage() {
@@ -40,7 +40,6 @@ class Scraper {
   }
 
   async scrapeData() {
-    let item = {};
     try {
       let isDisabled =
         (await this.page.$(
@@ -54,6 +53,7 @@ class Scraper {
           )) === null;
           for (let i = 0;i<productHandles.length;i++) {
             const productHandle=productHandles[i];
+            let item = {};
           //Image Extraction
           try {
             const Image = await this.page.evaluate(
@@ -71,10 +71,19 @@ class Scraper {
           }
           // Last Month Sales
           try {
-            //const
-            item.LMS='Unknown';
+            const lms = await this.page.evaluate(
+              (el) =>
+                el
+                  .querySelector(
+                    'div:nth-child(9) > div > div > div > div > div.a-section.a-spacing-small.puis-padding-left-small.puis-padding-right-small > div:nth-child(2) > div.a-row.a-size-base > span'
+                  )
+                  .getAttribute("src"),
+              productHandle
+            );
+            item.lms=lms?lms.textContent:'Undetermined';
+            console.log(lms);
           } catch (error) {
-            item.LMS='Unknown';
+            item.lms='Undetermined';
           }
           
           try {
@@ -88,6 +97,8 @@ class Scraper {
             const page = await this.openAnotherPage(link);
             const pageScraper = new ProductScraper(page, this.dataFile);
             const details = await pageScraper.scrapeProduct(); // it will automatically come back to the page
+            item.details = details;
+            this.dataFile.write(item);
             //this.dataFile.Write(Image, true);
           } catch (error) {
             //this.dataFile.Write('Not Found', true);
@@ -129,7 +140,7 @@ class ProductScraper {
         const element = document.querySelector(
           "span.a-price > span.a-offscreen"
         );
-        return element ? element.textContent : "Not found";
+        return element ? element.textContent : 'Unknown';
       });
       details.price=price;
     } catch (error) {
@@ -138,9 +149,9 @@ class ProductScraper {
     try {
       let nameTemp = await this.page.evaluate(() => {
         const element = document.querySelector("#productTitle");
-        return element ? element.textContent : "Not found";
+        return element ? element.textContent : 'Unknown';
       });
-      const name = nameTemp.ProductName.replace(/[\n,"']/g, " ").trim();
+      const name = nameTemp.replace(/[\n,"']/g, " ").trim();
       details.name=name;
     } catch (error) {
       details.name='Unknown';
@@ -149,7 +160,7 @@ class ProductScraper {
     try {
       let ratingsTemp = await this.page.evaluate(() => {
         const element = document.querySelector("#acrCustomerReviewText");
-        return element ? element.textContent : "Not found";
+        return element ? element.textContent : 'Unknown';
       });
       const ratings = parseInt(ratingsTemp.replace(/[,]/g, ""));
       details.ratings = ratings;
@@ -163,7 +174,7 @@ class ProductScraper {
           const element = document.querySelector(
             "#acrPopover > span.a-declarative > a > span"
           );
-          return element ? element.textContent : "Not found";
+          return element ? element.textContent : 'Unknown';
         })
       );
       details.rating=rating;
@@ -201,7 +212,7 @@ class ProductScraper {
         const element = document.querySelector(
           "#detailBulletsWrapper_feature_div > ul:nth-child(4) > li > span"
         );
-        return element ? element.textContent.slice(27).trim() : "Not found";
+        return element ? element.textContent.slice(27).replace(/[,]/g, "").trim() : 'Unknown';
       });
       details.bsr=bsr;
     } catch (error) {
@@ -215,7 +226,7 @@ class ProductScraper {
         );
         return element
           ? element.textContent.replace(/[\n, ]/g, "").trim()
-          : "Not found";
+          : 'Unknown';
       });
       details.category=category;
     } catch (error) {
@@ -225,7 +236,7 @@ class ProductScraper {
     try {
       let brandString = await this.page.evaluate(() => {
         const element = document.querySelector("#bylineInfo");
-        return element ? element.textContent.trim() : "Not found";
+        return element ? element.textContent.replace(/[,]/g, "").trim() : 'Unknown';
       });
       const brand =
         brandString.slice(0, 1) === "V"
@@ -237,6 +248,7 @@ class ProductScraper {
       details.brand="Unknown";
     }
     await this.page.close();
+    return details;
   }
   async previousPage() {
     await this.page.goBack();
@@ -255,7 +267,7 @@ class ProductScraper {
 
   const myScraper = new Scraper(
     browser,
-    "https://www.amazon.com/s?k=i+love+mom+Tshirt&crid=3NJOJ02SWWGKG&sprefix=i+love+mom+tshir%2Caps%2C239&ref=nb_sb_noss_2"
+    "https://www.amazon.com/s?k=pencils&crid=387L6G5X6B9PL&sprefix=%2Caps%2C2158&ref=nb_sb_ss_sx-trend-t-ps-d_12_0"
   );
   await myScraper.openPage();
   await myScraper.scrapeData();
@@ -276,13 +288,11 @@ class CsvFile {
     });
   }
 
-  Write(content, isNewLine) {
-    if (!isNewLine) {
-      fs.appendFile(this.fileName, `,${content}`, (err) => {
-        if (err) throw err;
-      });
-    } else {
-      fs.appendFile(this.fileName, '\n'+`${content}`, (err) => {
+  write(item) {
+    if (item.details.name !== 'Unknown') {
+      //Name,Last Month Sales,Price,Image,Number Of Reviews,Rating,Launch Date,Best Seller Rank,Category,Brand\n
+      console.log("Scraped!");
+      fs.appendFile(this.fileName, `${item.details.name},${item.lms},${item.details.price},${item.Image},${item.details.ratings},${item.details.rating},${item.details.launchDate},${item.details.bsr},${item.details.category},${item.details.brand}\n`, (err) => {
         if (err) throw err;
       });
     }
